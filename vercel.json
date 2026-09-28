@@ -1,13 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "//": "A pasta painel/ passa a ser a raiz do site. A primeira versao disto redirecionava so o '/', por rewrite, e quebrou o deploy: rewrite nao muda o endereco na barra, entao a pagina continuava em '/' e cada caminho relativo dela — app.js, src/motor.js, motor/duckdb.wasm — era procurado na raiz, onde nao existe. Seis 404 e a pagina parada na tela de erro. A regra de baixo leva todo caminho nao encontrado para dentro de painel/, e o endereco publicado fica sendo so o dominio. O Vercel so aplica rewrite depois de nao achar o arquivo de verdade, entao README.md e vercel.json continuam sendo eles mesmos.",
-
   "rewrites": [
     { "source": "/", "destination": "/painel/observatorio.html" },
     { "source": "/(.*)", "destination": "/painel/$1" }
   ],
-
   "headers": [
     {
       "source": "/painel/motor/duckdb.wasm",

@@ -43,11 +43,36 @@ instrumento de medida, óptica, relógio, mídia e memória, que a divisão
 
 ## Publicação
 
-Site estático. No Vercel, sem build: *Framework Preset* `Other`,
-build command vazio, *Output Directory* a raiz. O `vercel.json` cuida
-do redirecionamento da raiz para o painel.
+Site estático, sem build. No Vercel: *Framework Preset* `Other`,
+*Build Command* vazio, *Output Directory* vazio, *Root Directory* na
+raiz do repositório.
+
+O `vercel.json` faz a pasta `painel/` ser a raiz do site: `/` serve a
+página e todo caminho não encontrado na raiz é procurado dentro de
+`painel/`. Assim o endereço publicado é só o domínio, e nem o `.bat`
+nem o espelhamento precisam mudar de lugar.
+
+### Duas armadilhas, as duas já custaram um deploy
+
+**Rewrite não é redirect.** A primeira versão mandava só o `/` para
+`painel/observatorio.html`, por rewrite. Rewrite não muda o endereço
+na barra: a página continuava em `/`, e cada caminho relativo dela —
+`app.js`, `plotly.min.js`, `src/motor.js` — era procurado na raiz do
+site, onde não existe. Seis 404 e a página parada na tela de erro. Daí
+a segunda regra, que leva tudo para dentro de `painel/`.
+
+**O `vercel.json` não aceita comentário.** O Vercel valida o arquivo
+contra um esquema fechado e recusa propriedade que não conheça —
+inclusive a chave `"//"` que se costuma usar para comentar JSON. Com
+ela dentro, o deploy falha antes de começar, e o sintoma visto de fora
+é simplesmente nada acontecer. Explicação vai em prosa, aqui; o
+`vercel.json` fica só com o que o esquema prevê.
+
+### Tamanho
 
 Os arquivos de dados são grandes e versionados no Git como binários —
-cada regeração de cubo grava uma cópia nova no histórico. Se o
-repositório incomodar de tamanho, o caminho é tirar `painel/dados/` do
-Git e servir os cubos de um armazenamento à parte.
+cada regeração de cubo grava uma cópia nova no histórico. O Vercel os
+serve sem reclamar, e o `fato.parquet`, com 94,76 MiB, passa no limite
+de 100 MiB por arquivo do GitHub — mas com pouca folga: quando o cubo
+crescer, o push vai ser recusado. Nessa hora o caminho é tirar
+`painel/dados/` do Git e servir os cubos de um armazenamento à parte.
