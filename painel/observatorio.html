@@ -1,0 +1,669 @@
+<title>Observatório Mundial de Patentes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" media="all" onerror="this.media='none'">
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #0B0F19;
+    --surface: #141C2C;
+    --surface-2: #1A2338;
+    --line: #223049;
+    --line-soft: #18202F;
+    --sem-dado: #222C40;
+    --ink: #E6ECF7;
+    --ink-muted: #8494AE;
+    --ink-faint: #5D6B84;
+    --acento: #22B5E1;
+    --acento-forte: #4DD2FF;
+    --pos: #22C39A;
+    --neg: #F2777A;
+    /* rampa sequencial de matiz unica, validada contra o fundo escuro */
+    --r1: #00648E; --r2: #007FAA; --r3: #0098C4;
+    --r4: #22B5E1; --r5: #4DD2FF; --r6: #6FF0FF;
+    /* categorica de 5, validada em TODOS os pares: normal 17,1 / CVD 9,2 */
+    --c1: #3B63F3; --c2: #BC3800; --c3: #B88900;
+    --c4: #009ECE; --c5: #E2358F;
+    --faixa-a: #0A2A46; --faixa-b: #16294F;
+    --display: Archivo, "Segoe UI", system-ui, sans-serif;
+    --corpo: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --ground: #F1F4F9;
+    --surface: #FFFFFF;
+    --surface-2: #F6F9FC;
+    --line: #D3DBE7;
+    --line-soft: #E4EAF3;
+    --sem-dado: #E2E8F1;
+    --ink: #0F1828;
+    --ink-muted: #53637D;
+    --ink-faint: #7B89A2;
+    --acento: #0079A0;
+    --acento-forte: #005C7C;
+    --pos: #0B7F5C;
+    --neg: #C33A3D;
+    --r1: #35BEEC; --r2: #0FA7D3; --r3: #0090B9;
+    --r4: #0079A0; --r5: #006287; --r6: #004B6E;
+    --c1: #005ABD; --c2: #F45000; --c3: #00A58D;
+    --c4: #A664FE; --c5: #844400;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--corpo); font-size: 15px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: var(--display); letter-spacing: -.012em; }
+  button, select, input { font-family: inherit; font-size: inherit; }
+
+  /* ------------------------------------------------------- cabecalho */
+  .faixa {
+    background: linear-gradient(104deg, var(--faixa-a), var(--faixa-b));
+    padding: 24px 32px 26px; display: flex; gap: 20px;
+    align-items: flex-start; justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .faixa h1 {
+    margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.72rem;
+    line-height: 1.16; text-wrap: balance;
+  }
+  .faixa p { margin: 7px 0 0; color: #A9C4DC; font-size: .85rem;
+             max-width: 74ch; }
+  .faixa code { font-family: var(--mono); font-size: .79rem; color: #CFE6F5; }
+  #tema {
+    flex: 0 0 auto; width: 32px; height: 32px; padding: 0; cursor: pointer;
+    display: grid; place-items: center; border-radius: 7px;
+    color: #A9C4DC; background: rgba(255, 255, 255, .07);
+    border: 1px solid rgba(255, 255, 255, .16);
+  }
+  #tema:hover { color: #FFFFFF; border-color: rgba(255, 255, 255, .4); }
+
+  /* ------------------------------------------------------- estrutura */
+  .quadro {
+    display: grid; grid-template-columns: 276px minmax(0, 1fr);
+    gap: 18px; align-items: start;
+    padding: 18px 18px 48px; max-width: 1660px; margin: 0 auto;
+  }
+  .lateral {
+    position: sticky; top: 14px; display: flex; flex-direction: column;
+    gap: 12px; max-height: calc(100vh - 28px); overflow-y: auto;
+    scrollbar-width: thin; padding-right: 4px;
+  }
+  .lateral::-webkit-scrollbar { width: 6px; }
+  .lateral::-webkit-scrollbar-thumb {
+    background: var(--line); border-radius: 3px;
+  }
+  .corpo { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .caixa {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 9px; padding: 14px 16px 16px; min-width: 0;
+  }
+  .caixa > h2 { margin: 0 0 10px; font-size: 1rem; font-weight: 600; }
+
+  /* ------------------------------------------------------------ abas */
+  /* A pagina era uma rolagem so, com sete paineis empilhados. Agora
+     cada aba e uma tela: o que nao esta na aba nao esta desenhado, e o
+     Plotly mede zero em container escondido — por isso a troca de aba
+     redesenha o que entrou. */
+  .abas {
+    display: flex; gap: 2px; flex-wrap: wrap; padding: 3px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 9px;
+  }
+  .abas button {
+    flex: 1 1 auto; padding: 8px 14px; cursor: pointer; border: none;
+    border-radius: 6px; font-size: .85rem; font-weight: 600;
+    color: var(--ink-muted); background: transparent; white-space: nowrap;
+  }
+  .abas button:hover { color: var(--ink); background: var(--surface-2); }
+  .abas button[aria-pressed="true"] {
+    color: #FFFFFF; background: var(--acento);
+  }
+  :root[data-theme="light"] .abas button[aria-pressed="true"] {
+    color: #FFFFFF;
+  }
+  .vista { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .magro {
+    width: auto; padding: 6px 9px; border-radius: 6px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line);
+  }
+  .rotulo {
+    font-family: var(--mono); font-size: .63rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint);
+    margin: 0 0 7px; font-weight: 600;
+  }
+
+  /* --------------------------------------------------------- filtros */
+  .filtro + .filtro { margin-top: 13px; }
+  .filtro select, .filtro input { width: 100%; padding: 6px 8px;
+    border-radius: 6px; color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line); }
+  .filtro select:focus, .filtro input:focus {
+    outline: 2px solid var(--acento); outline-offset: -1px; }
+  select[multiple] { min-height: 122px; }
+  /* PAIS: busca com sugestao. A lista fixa de 274 paises ocupava um
+     terco da barra lateral e empurrava periodo, setor e IPC para baixo
+     da dobra — e ninguem rola 274 itens de qualquer forma. */
+  .busca-pais { position: relative; }
+  .sugestoes { position: absolute; z-index: 30; left: 0; right: 0;
+    top: calc(100% + 3px); margin: 0; padding: 4px; list-style: none;
+    max-height: 212px; overflow-y: auto; border-radius: 6px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .38); }
+  .sugestoes li { display: flex; justify-content: space-between; gap: 10px;
+    padding: 6px 8px; border-radius: 4px; cursor: pointer;
+    font-size: .8rem; }
+  .sugestoes li .qt { color: var(--ink-faint); font-family: var(--mono);
+    font-size: .71rem; }
+  .sugestoes li:hover, .sugestoes li[aria-selected="true"] {
+    background: var(--acento); color: #04121C; }
+  .sugestoes li:hover .qt, .sugestoes li[aria-selected="true"] .qt {
+    color: #04121C; }
+  .sugestoes li.vazio { cursor: default; color: var(--ink-faint); }
+  .sugestoes li.vazio:hover { background: none; color: var(--ink-faint); }
+  .fichas { display: flex; flex-wrap: wrap; gap: 5px; }
+  .fichas:not(:empty) { margin-top: 7px; }
+  .ficha { display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 4px 3px 8px; border-radius: 999px; font-size: .74rem;
+    background: var(--surface-2); border: 1px solid var(--line); }
+  .ficha button { border: 0; background: none; cursor: pointer;
+    color: var(--ink-muted); font-size: .95rem; line-height: 1;
+    padding: 0 3px; border-radius: 50%; }
+  .ficha button:hover { color: var(--neg); }
+  .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lente { display: grid; grid-template-columns: 1fr 1fr; }
+  .lente button {
+    padding: 7px 6px; cursor: pointer; font-size: .77rem;
+    color: var(--ink-muted); background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .lente button:first-child { border-radius: 6px 0 0 6px; }
+  .lente button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+  .lente button[aria-pressed="true"] {
+    color: #FFFFFF; background: var(--acento); border-color: var(--acento);
+    font-weight: 600;
+  }
+  .achados {
+    margin-top: 13px; padding: 10px 12px; border-radius: 7px;
+    background: var(--surface-2); border: 1px solid var(--line);
+  }
+  .achados b {
+    display: block; font-family: var(--display); font-size: 1.3rem;
+    font-weight: 700; color: var(--acento-forte); line-height: 1.12;
+    font-variant-numeric: tabular-nums;
+  }
+  .achados span { font-size: .77rem; color: var(--ink-muted); }
+  .limpar {
+    width: 100%; margin-top: 10px; padding: 7px; cursor: pointer;
+    border-radius: 6px; color: var(--ink-muted);
+    background: transparent; border: 1px dashed var(--line);
+  }
+  .limpar:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  /* --------------------------------------------------------- cartoes */
+  .cartoes {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  }
+  .cartao {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 9px; padding: 12px 14px 13px;
+  }
+  .cartao .rotulo { margin-bottom: 5px; }
+  .cartao .valor {
+    font-family: var(--display); font-size: 1.58rem; font-weight: 700;
+    line-height: 1.1; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .cartao .nota { font-size: .75rem; color: var(--ink-muted);
+                  margin-top: 2px; }
+
+  /* -------------------------------------------------------- graficos */
+  .grade-2 { display: grid; gap: 16px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .grade-ii { display: grid; gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 1180px) {
+    .grade-2, .grade-ii { grid-template-columns: minmax(0, 1fr); }
+    .quadro { grid-template-columns: minmax(0, 1fr); }
+    .lateral { position: static; max-height: none; }
+  }
+  .tela { width: 100%; }
+  .migalhas {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 10px; font-size: .8rem;
+  }
+  .migalhas button {
+    padding: 3px 9px; cursor: pointer; border-radius: 20px;
+    font-family: var(--mono); font-size: .73rem;
+    color: var(--ink-muted); background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .migalhas button:hover { color: var(--ink); border-color: var(--acento); }
+  .migalhas span { color: var(--ink-faint); }
+
+  /* ------------------------------------------------------- informacao */
+  .info {
+    display: inline-grid; place-items: center; width: 15px; height: 15px;
+    margin-left: 5px; border-radius: 50%; cursor: help; vertical-align: 1px;
+    font-family: var(--mono); font-size: .62rem; font-weight: 600;
+    color: var(--ink-faint); background: var(--surface-2);
+    border: 1px solid var(--line); position: relative;
+  }
+  .info:hover { color: var(--acento); border-color: var(--acento); }
+  .info > span {
+    display: none; position: absolute; left: 50%; bottom: 150%;
+    transform: translateX(-50%); width: 320px; z-index: 40;
+    padding: 9px 11px; border-radius: 7px; text-align: left;
+    font-family: var(--corpo); font-size: .78rem; font-weight: 400;
+    line-height: 1.45; color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(0, 0, 0, .45);
+    cursor: default; text-transform: none; letter-spacing: 0;
+    white-space: normal;
+  }
+  .info:hover > span, .info:focus-visible > span { display: block; }
+  /* o que antes era subtitulo abaixo do grafico: fica aqui, em destaque,
+     porque muda com o recorte e e o que o leitor pergunta primeiro */
+  .info .viva:not(:empty) {
+    display: block; margin-top: 7px; padding-top: 7px;
+    border-top: 1px solid var(--line); color: var(--acento-forte);
+  }
+  .info > span em {
+    display: block; margin-top: 6px; font-style: normal;
+    font-family: var(--mono); font-size: .67rem; color: var(--ink-faint);
+  }
+
+  /* ---------------------------------------------------------- tabela */
+  .rolagem { overflow-x: auto; max-height: 460px; }
+  table.dados { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  table.dados th, table.dados td {
+    padding: 6px 10px; text-align: left; white-space: nowrap;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  table.dados th {
+    font-family: var(--mono); font-size: .63rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-faint);
+    cursor: pointer; user-select: none; position: sticky; top: 0; z-index: 2;
+    background: var(--surface);
+  }
+  table.dados th:hover { color: var(--ink); }
+  table.dados td.num, table.dados th.num {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  table.dados td.cod { font-family: var(--mono); font-size: .76rem; }
+  table.dados td.larga { white-space: normal; min-width: 220px; }
+  .barra-tabela {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .barra-tabela input[type="search"] {
+    flex: 1 1 210px; min-width: 150px; padding: 6px 9px; border-radius: 6px;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .botao {
+    padding: 6px 12px; cursor: pointer; border-radius: 6px;
+    color: var(--ink-muted); background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .botao:hover:not([disabled]) { color: var(--ink);
+                                 border-color: var(--ink-faint); }
+  .botao[disabled] { opacity: .4; cursor: default; }
+  .pag { font-size: .8rem; color: var(--ink-muted);
+         font-variant-numeric: tabular-nums; }
+
+  /* ----------------------------------------------------- metodologia */
+  details.notas {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 9px;
+  }
+  details.notas > summary {
+    cursor: pointer; list-style: none; padding: 13px 16px;
+    font-family: var(--display); font-weight: 600; font-size: .97rem;
+    display: flex; align-items: center; gap: 9px;
+  }
+  details.notas > summary::-webkit-details-marker { display: none; }
+  details.notas > summary::before {
+    content: ""; width: 7px; height: 7px; flex: 0 0 auto;
+    border-right: 2px solid var(--ink-faint);
+    border-bottom: 2px solid var(--ink-faint);
+    transform: rotate(-45deg); transition: transform .16s;
+  }
+  details.notas[open] > summary::before { transform: rotate(45deg); }
+  details.notas > div { padding: 0 16px 16px; }
+  .notas h4 {
+    margin: 15px 0 4px; font-family: var(--display); font-size: .86rem;
+    font-weight: 600; color: var(--acento);
+  }
+  .notas p { margin: 0 0 8px; font-size: .85rem; color: var(--ink-muted); }
+  .notas p strong { color: var(--ink); font-weight: 600; }
+  .notas code {
+    font-family: var(--mono); font-size: .78rem; color: var(--ink);
+    background: var(--surface-2); padding: 1px 4px; border-radius: 3px;
+  }
+  .notas ul { margin: 0 0 8px; padding-left: 18px; }
+  .notas li { font-size: .85rem; color: var(--ink-muted); margin-bottom: 4px; }
+  .destaque {
+    border-left: 3px solid var(--acento); padding: 2px 0 2px 12px;
+    margin: 0 0 10px;
+  }
+
+  /* ------------------------------------------------------- abertura */
+  #abertura {
+    position: fixed; inset: 0; z-index: 90; display: grid;
+    place-items: center; background: var(--ground); text-align: center;
+  }
+  #abertura .miolo { max-width: 560px; padding: 24px; }
+  #abertura h2 { margin: 0 0 6px; font-size: 1.22rem; }
+  #abertura p { color: var(--ink-muted); font-size: .87rem; margin: 0; }
+  .trilho {
+    height: 4px; border-radius: 2px; background: var(--surface-2);
+    overflow: hidden; margin-top: 18px;
+  }
+  .trilho i { display: block; height: 100%; width: 0;
+              background: var(--acento); transition: width .25s; }
+  #erro-abertura {
+    margin-top: 18px; padding: 13px 15px; border-radius: 8px;
+    text-align: left; font-size: .84rem; line-height: 1.5;
+    color: var(--ink); background: var(--surface);
+    border: 1px solid var(--neg);
+  }
+  #erro-abertura code { font-family: var(--mono); font-size: .78rem; }
+</style>
+
+<div class="faixa">
+  <div>
+    <h1>Observatório Mundial de Patentes</h1>
+    <p id="linha-base">Explorador da base local do Google Patents.</p>
+  </div>
+  <button id="tema" type="button" title="Alternar tema" aria-label="Alternar tema"></button>
+</div>
+
+<div class="quadro">
+  <aside class="lateral">
+    <div class="caixa">
+      <p class="rotulo">Universo</p>
+      <div class="filtro">
+        <div class="lente">
+          <button type="button" id="lente-of" data-lente="of" aria-pressed="true">Escritório</button>
+          <button type="button" id="lente-ti" data-lente="ti" aria-pressed="false">Titular</button>
+        </div>
+      </div>
+
+      <div class="filtro">
+        <p class="rotulo">País<span class="info" tabindex="0">i<span
+          id="dica-pais"></span></span></p>
+        <div class="busca-pais">
+          <input type="search" id="busca-pais" autocomplete="off"
+            role="combobox" aria-expanded="false" aria-autocomplete="list"
+            aria-controls="pais-sugestoes"
+            placeholder="digite o nome ou a sigla…">
+          <ul class="sugestoes" id="pais-sugestoes" role="listbox"
+            hidden></ul>
+        </div>
+        <div class="fichas" id="pais-fichas"></div>
+        <select id="f-pais" multiple hidden></select>
+      </div>
+
+      <div class="filtro">
+        <p class="rotulo">Período<span class="info" tabindex="0">i<span
+          id="dica-periodo"></span></span></p>
+        <div class="dupla">
+          <select id="f-ano1"></select>
+          <select id="f-ano2"></select>
+        </div>
+      </div>
+
+      <div class="filtro">
+        <p class="rotulo">Setor / área tecnológica<span class="info"
+          tabindex="0">i<span id="dica-setor"></span></span></p>
+        <select id="f-setor"></select>
+      </div>
+
+      <div class="filtro">
+        <p class="rotulo">Classificação IPC<span class="info" tabindex="0">i<span
+          id="dica-ipc"></span></span></p>
+        <select id="f-sec"><option value="">Todas as seções</option></select>
+        <select id="f-cls" style="margin-top:6px"><option value="">Todas as classes</option></select>
+        <select id="f-sub" style="margin-top:6px"><option value="">Todas as subclasses</option></select>
+      </div>
+
+      <div class="filtro">
+        <p class="rotulo">Situação<span class="info" tabindex="0">i<span
+          id="dica-situacao"></span></span></p>
+        <select id="f-conc">
+          <option value="">Todas as publicações</option>
+          <option value="1">Só com data de concessão</option>
+          <option value="0">Sem data de concessão</option>
+        </select>
+      </div>
+
+      <div class="achados">
+        <b id="achados-n" class="conta">—</b>
+        <span id="achados-t">publicações no recorte</span>
+      </div>
+      <button type="button" class="limpar" id="limpar">Limpar todos os filtros</button>
+    </div>
+  </aside>
+
+  <main class="corpo">
+    <nav class="abas" id="abas" aria-label="Seções do observatório">
+      <button type="button" data-v="panorama" aria-pressed="true">Panorama</button>
+      <button type="button" data-v="territorios" aria-pressed="false">Territórios</button>
+      <button type="button" data-v="tecnologia" aria-pressed="false">Tecnologia</button>
+      <button type="button" data-v="tempo" aria-pressed="false">Tempo</button>
+      <button type="button" data-v="depositantes" aria-pressed="false">Depositantes</button>
+      <button type="button" data-v="tabela" aria-pressed="false">Tabela</button>
+      <button type="button" data-v="metodologia" aria-pressed="false">Metodologia</button>
+    </nav>
+
+    <!-- ===================================================== panorama -->
+    <div class="vista" id="v-panorama">
+      <section class="cartoes" id="cartoes"></section>
+      <div class="grade-2">
+        <div class="caixa">
+          <h2>Onde estão as patentes<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-mapa"></span><span class="viva"
+            id="sub-mapa"></span></span></span></h2>
+          <div id="mapa" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2><span id="tit-rosca">Áreas da classificação</span><span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-rosca"></span><span class="viva"
+            id="sub-rosca"></span></span></span></h2>
+          <div id="rosca-secoes" class="tela"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================== territorios -->
+    <div class="vista" id="v-territorios" hidden>
+      <div class="grade-2">
+        <div class="caixa">
+          <h2>Ranking de territórios<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-ranking"></span><span class="viva"
+            id="sub-ranking"></span></span></span></h2>
+          <div id="ranking" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2>Concentração<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-conc"></span><span class="viva"
+            id="sub-concentracao"></span></span></span></h2>
+          <div id="conc-terr" class="tela"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- =================================================== tecnologia -->
+    <div class="vista" id="v-tecnologia" hidden>
+      <div class="grade-2">
+        <div class="caixa">
+          <h2>Perfil tecnológico<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-perfil"></span><span class="viva"
+            id="sub-perfil"></span></span></span></h2>
+          <div class="migalhas" id="migalhas"></div>
+          <div id="perfil" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2>Publicações com concessão<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-concessao"></span><span class="viva"
+            id="sub-concessao"></span></span></span></h2>
+          <div id="rosca-concessao" class="tela"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== tempo -->
+    <div class="vista" id="v-tempo" hidden>
+      <div class="grade-2">
+        <div class="caixa">
+          <h2>Evolução ao longo dos anos<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-serie"></span><span class="viva"
+            id="sub-serie"></span></span></span></h2>
+          <div id="serie" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2>Média anual por década<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-decadas"></span><span class="viva"
+            id="sub-decadas"></span></span></span></h2>
+          <div id="decadas" class="tela"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================= depositantes -->
+    <div class="vista" id="v-depositantes" hidden>
+      <div class="grade-2">
+        <div class="caixa">
+          <h2>Principais depositantes<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-titulares"></span><span class="viva"
+            id="sub-titulares"></span></span></span></h2>
+          <div id="titulares" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2>Concentração entre depositantes<span class="info"
+            tabindex="0">i<span class="bolha"><span
+            id="dica-conc-tit"></span><span class="viva"
+            id="sub-conc-tit"></span></span></span></h2>
+          <div id="conc-tit" class="tela"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= tabela -->
+    <div class="vista" id="v-tabela" hidden>
+      <div class="caixa">
+        <h2>Tabela de resultados<span class="info" tabindex="0">i<span
+          class="bolha"><span id="dica-tabela"></span><span class="viva"
+          id="sub-tabela"></span></span></span></h2>
+        <div class="barra-tabela">
+          <input type="search" id="busca-tabela"
+                 placeholder="filtrar por código IPC, país ou descrição...">
+          <select id="f-grao" class="magro">
+            <option value="sub">por subclasse</option>
+            <option value="ipc">por código IPC completo</option>
+            <option value="pais">por país</option>
+            <option value="ano">por ano</option>
+            <option value="tit">por depositante</option>
+          </select>
+          <button type="button" class="botao" id="tab-ant" disabled>‹</button>
+          <span class="pag" id="tab-pag">—</span>
+          <button type="button" class="botao" id="tab-prox" disabled>›</button>
+          <button type="button" class="botao" id="baixar">Baixar CSV</button>
+        </div>
+        <div class="rolagem">
+          <table class="dados" id="tabela">
+            <thead><tr id="tab-cab"></tr></thead>
+            <tbody id="tab-corpo"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================================================== metodologia -->
+    <div class="vista" id="v-metodologia" hidden>
+      <details class="notas" id="nota-setor">
+        <summary>Nota metodológica do recorte selecionado</summary>
+        <div id="corpo-nota-setor"></div>
+      </details>
+      <details class="notas">
+        <summary>Metodologia geral e limitações</summary>
+        <div id="corpo-nota-geral"></div>
+      </details>
+      <details class="notas">
+        <summary>Informações da base</summary>
+        <div id="corpo-nota-base"></div>
+      </details>
+    </div>
+  </main>
+
+</div>
+
+<div id="abertura">
+  <div class="miolo">
+    <h2 id="ab-titulo">Abrindo o observatório</h2>
+    <p id="ab-texto">Iniciando o motor de consulta...</p>
+    <div class="trilho"><i id="ab-barra"></i></div>
+    <div id="erro-abertura" hidden></div>
+  </div>
+</div>
+
+<script>
+  // Rede de segurança, e ela precisa ser um script CLÁSSICO.
+  //
+  // O app.js é um módulo ES, e o navegador bloqueia módulo aberto por
+  // file:// — "Access to script from origin 'null'". Quando isso
+  // acontece, nada do app.js roda: nem a tela de erro que vive lá
+  // dentro. A página ficava parada em "Iniciando o motor de consulta"
+  // para sempre, sem dizer o motivo. Script clássico carrega mesmo
+  // nesse caso, então o aviso sai daqui.
+  (function () {
+    var avisado = false;
+    function explicar() {
+      if (avisado || window.__vivo) return;
+      avisado = true;
+      document.getElementById("ab-titulo").textContent =
+        "Abra pelo atalho, não por este arquivo";
+      document.getElementById("ab-texto").innerHTML =
+        "Esta página lê cerca de 200 MB de dados que estão na pasta ao "
+        + "lado dela. O Chrome e o Edge proíbem isso quando o arquivo é "
+        + "aberto com duplo clique — é uma regra de segurança do "
+        + "navegador, não um defeito da página.";
+      var cx = document.getElementById("erro-abertura");
+      cx.hidden = false;
+      // A mesma pasta serve o duplo clique e o endereço publicado. Só
+      // em file:// a saída é o .bat; online essa instrução mandaria o
+      // leitor procurar um arquivo que não existe.
+      cx.innerHTML = (location.protocol === "file:"
+        ? "<b>O que fazer:</b> volte uma pasta e abra o "
+          + "<code>ABRIR O OBSERVATORIO.bat</code>.<br><br>"
+          + "Ele abre o navegador com permissão para ler estes arquivos, "
+          + "numa janela à parte. Não instala nada, não altera o seu "
+          + "navegador e não mexe nas abas que você já tem abertas."
+        : "<b>O que fazer:</b> recarregue a página. Se insistir, o "
+          + "navegador pode estar bloqueando scripts neste endereço, ou "
+          + "algum arquivo do painel não subiu.")
+        + "<br><br><span style='color:var(--ink-faint)'>Motivo técnico: "
+        + "o navegador bloqueou o módulo <code>app.js</code> por "
+        + "política de origem (<code>origin 'null'</code>).</span>";
+      document.getElementById("ab-barra").style.background =
+        "var(--neg)";
+      document.getElementById("ab-barra").style.width = "100%";
+    }
+    // o erro de carregamento do módulo chega como evento de recurso
+    window.addEventListener("error", function (e) {
+      if (e.target && e.target.tagName === "SCRIPT") explicar();
+    }, true);
+    // e, por garantia, um prazo: se o módulo não deu sinal de vida
+    setTimeout(explicar, 2500);
+  })();
+</script>
+
+<script src="plotly.min.js"></script>
+<script src="metadados/meta.js"></script>
+<script src="metadados/titulares.js"></script>
+<script src="dados/geo.js"></script>
+<script type="module" src="app.js"></script>

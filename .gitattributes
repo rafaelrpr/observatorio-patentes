@@ -1,0 +1,15 @@
+# Os dados e o motor são binários: o Git não deve tentar converter
+# quebras de linha neles. Um parquet "normalizado" para CRLF vira lixo.
+*.parquet binary
+*.wasm    binary
+
+# O resto é texto, mas fica com LF no repositório e na cópia de
+# trabalho: a página também é servida pela web, e não há razão para
+# guardar CRLF só porque foi editada no Windows.
+*.html  text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+
+# O .bat é lido pelo cmd.exe do Windows, que exige CRLF.
+*.bat   text eol=crlf

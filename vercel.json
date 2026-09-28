@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/", "destination": "/painel/observatorio.html" },
+    { "source": "/painel", "destination": "/painel/observatorio.html" }
+  ],
+  "headers": [
+    {
+      "source": "/painel/motor/duckdb.wasm",
+      "headers": [
+        { "key": "Content-Type", "value": "application/wasm" }
+      ]
+    }
+  ]
+}

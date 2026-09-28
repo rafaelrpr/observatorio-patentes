@@ -1,0 +1,7 @@
+# A pasta é, ao mesmo tempo, o repositório e o espelho que o script
+# 04_montar.py atualiza no Desktop. Só o que o painel precisa entra.
+.vercel/
+Thumbs.db
+desktop.ini
+*.crdownload
+*.tmp
