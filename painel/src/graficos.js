@@ -148,8 +148,9 @@ export function barras(alvo, linhas, op = {}) {
     textfont: { size: 11, color: t.muted, family: t.corpo },
     customdata: dados.map((d) => [d.titulo || d.rotulo, inteiro(d.n),
                                   pct(d.share), d.extra || ""]),
-    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} publicações"
-                 + "<br>%{customdata[2]} do recorte"
+    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} "
+                 + (op.unidade || "publicações")
+                 + "<br>%{customdata[2]} " + (op.base || "do recorte")
                  + "%{customdata[3]}<extra></extra>",
   };
   const alt = op.altura || Math.max(190, 26 * dados.length + 34);
@@ -272,7 +273,9 @@ export function rosca(alvo, fatias, op = {}) {
     textinfo: "label+percent", textposition: "outside",
     automargin: true,
     outsidetextfont: { size: 11, color: t.muted, family: t.corpo },
-    texttemplate: "%{label}<br>%{percent}",
+    // o %{percent} do Plotly sai em ingles ("1.37%"); o percentual vai
+    // pronto, no formato brasileiro, como todo numero da pagina
+    texttemplate: "%{label}<br>%{customdata[2]}",
     customdata: validas.map((f) => [f.titulo || f.rotulo, inteiro(f.n),
                                     pct(100 * f.n / soma), f.extra || ""]),
     hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} publicações"

@@ -5,13 +5,15 @@
 
 import { inteiro, pct, um, curto, esc } from "./formato.js";
 
-const FONTE = "Base: patentes_publications_202511.parquet (Google Patents, "
-            + "via BigQuery), lida no navegador.";
+// sem nome de arquivo: a origem e o Google Patents, e e isso que o leitor
+// precisa saber (pedido do usuario)
+const FONTE = "Base: Google Patents, via BigQuery, lida no navegador.";
 
 /** Preenche os <span> das dicas. O ultimo paragrafo nomeia a base. */
 export function dicas($) {
   const b = window.META.base;
   const t = window.TITULARES || {};
+  const vigentes = window.META.subclasses.filter((s) => !s.x).length;
   const pares = {
     "dica-pais":
       "Dois campos diferentes da base respondem a pergunta \"de que país é "
@@ -28,27 +30,56 @@ export function dicas($) {
       + "saem. Os últimos anos da série estão incompletos: o pedido leva "
       + "cerca de 18 meses para ser publicado.",
     "dica-setor":
-      "Os setores não foram inventados: cada um vem de um dicionário. As "
-      + "oito <b>áreas</b> são as seções da IPC 2026.01, lidas dos PDFs "
-      + "oficiais da OMPI. <b>TIC</b> vem da composição de TIC da OMPI, nas "
-      + "duas versões que o Observatório usa. As <b>famílias de produto</b> "
-      + "são agrupamento nosso, declarado como tal. A nota metodológica "
-      + "abaixo da tabela muda conforme o setor escolhido.",
+      "Os setores da coluna SC Competitiva do de-para de CNAE do "
+      + "Observatório, com o mesmo nome e em ordem alfabética: para cada um, as "
+      + "subclasses da IPC que correspondem ao que as atividades dele "
+      + "fabricam, ou à técnica com que trabalham. Ficam de fora do seletor "
+      + "os setores sem nenhuma subclasse própria. Quais subclasses estão "
+      + "em cada setor, e por quê, está na aba Metodologia, em Composição "
+      + "dos setores. As oito seções da IPC ficam no filtro de "
+      + "Classificação, logo abaixo.",
+    "dica-familia":
+      "Aparece quando o setor escolhido se divide. As famílias seguem os "
+      + "grupos da CNAE do próprio setor no de-para — carnes, laticínios, "
+      + "bebidas —, e onde a IPC não separa dois grupos eles viram uma "
+      + "família só. No TIC são as onze famílias de produto do estudo. Cada "
+      + "subclasse cai numa família só.",
     "dica-ipc":
       "Classificação Internacional de Patentes, edição 2026.01: "
       + inteiro(window.META.secoes.length) + " seções, "
       + inteiro(window.META.classes.length) + " classes, "
-      + inteiro(window.META.subclasses.length) + " subclasses e "
+      + inteiro(vigentes) + " subclasses e "
       + inteiro(b.codigos_dic) + " códigos. Os três campos encaixam em "
-      + "cascata. Atenção: a base usa " + inteiro(b.subclasses_base)
-      + " subclasses, mais que as " + inteiro(window.META.subclasses.length)
+      + "cascata. Os títulos aparecem em português; o botão PT | EN, no "
+      + "alto da página, mostra o inglês oficial da OMPI. A tradução vai "
+      + "até a subclasse — os códigos completos ficam no inglês oficial. "
+      + "Atenção: a base usa " + inteiro(b.subclasses_base)
+      + " subclasses, mais que as " + inteiro(vigentes)
       + " vigentes — o excedente são códigos históricos, já retirados da "
-      + "classificação, que continuam rotulando publicações antigas.",
+      + "classificação, que continuam rotulando publicações antigas. As "
+      + "que ainda pesam, como a H01L, estão na lista marcadas como "
+      + "extintas.",
     "dica-situacao":
       "Só existe o que a base traz: <code>grant_date</code> preenchida ou "
       + "não. Isso <b>não</b> é situação jurídica. Uma patente pode ter "
       + "sido concedida e depois caducado por falta de anuidade, e a base "
-      + "não registra isso. Não se calcula aqui vencimento nem vigência.",
+      + "não registra isso. O prazo máximo de cada patente concedida está "
+      + "na aba Vencimento.",
+    "dica-venc-ano":
+      "Ano em que termina o prazo máximo da lei: 20 anos do depósito na "
+      + "invenção; no modelo de utilidade, o prazo de cada país (15 anos no "
+      + "Brasil, 10 na China). É o teto, não o vencimento real — a base não "
+      + "sabe quem deixou de pagar a anuidade. Cada patente conta uma vez, "
+      + "pelo pedido.",
+    "dica-venc-subs":
+      "As subclasses da IPC com mais patentes cujo prazo termina na janela "
+      + "escolhida: as tecnologias que mais vão entrar em domínio público. "
+      + "Respeita o setor e a classificação escolhidos na lateral.",
+    "dica-venc-paises":
+      "Onde vencem, pela lente da lateral: escritório (onde a patente vale) "
+      + "ou país do titular (de quem ela é). A proteção é territorial: o "
+      + "que não foi pedido num país já é livre nele, com ou sem "
+      + "vencimento.",
     "dica-mapa":
       "Cor em escala logarítmica, porque o maior escritório tem milhões de "
       + "publicações e o menor tem dezenas — em escala linear o mapa "
@@ -147,8 +178,8 @@ export function montarNotas($, META) {
 
   $("corpo-nota-geral").innerHTML = `
     <h4>De onde vêm os números</h4>
-    <p>Uma fonte só: o arquivo <code>${esc(b.arquivo)}</code>, ${gb} GB,
-    extraído da base pública do Google Patents no BigQuery. Nenhuma consulta
+    <p>Uma fonte só: uma extração de ${gb} GB da base pública do Google
+    Patents no BigQuery. Nenhuma consulta
     é feita à internet, nenhuma outra base de patentes é usada e nada
     completa ou corrige o que está no arquivo. Os dicionários da OMPI
     entram apenas como <strong>metadados</strong>: dão nome aos códigos e
@@ -242,10 +273,18 @@ export function montarNotas($, META) {
     "<tr><td>" + rot + "</td><td class='num'>" + inteiro(n)
     + "</td><td class='num'>" + pct(100 * n / b.linhas, 2) + "</td></tr>";
 
+  // Sem caminho e sem nome de arquivo: a fonte ja esta na metodologia
+  // geral, e o caminho era o da maquina de quem preparou — que o site
+  // publicava para qualquer um.
+  const dm = String(b.data_max || "");
+  const ate = dm.length === 8
+    ? dm.slice(6, 8) + "/" + dm.slice(4, 6) + "/" + dm.slice(0, 4) : "";
   $("corpo-nota-base").innerHTML = `
-    <h4>Arquivo</h4>
-    <p><code>${esc(b.caminho)}</code><br>${gb} GB · ${inteiro(b.linhas)}
-    registros · ${(b.colunas || []).length} colunas</p>
+    <h4>Base</h4>
+    <p>Google Patents, tabela pública de publicações no BigQuery.<br>
+    ${gb} GB · ${inteiro(b.linhas)} registros ·
+    ${(b.colunas || []).length} colunas${ate
+      ? ` · publicações até <strong>${ate}</strong>` : ""}</p>
 
     <h4>Contagens</h4>
     <ul>

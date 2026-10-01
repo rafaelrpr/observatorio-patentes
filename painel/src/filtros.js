@@ -12,6 +12,7 @@ export const estado = {
   paises: [],         // ids de pais
   ano1: "", ano2: "", // vazio = todo o periodo, inclusive sem data
   setor: "tudo",
+  familia: "",        // familia dentro do setor, quando ele tem
   sec: "", cls: "", sub: "",
   conc: "",
   nivel: "sec",       // detalhamento do perfil tecnologico
@@ -26,11 +27,25 @@ export function setorAtual() {
           || window.META.setores[0]);
 }
 
+/** A familia escolhida dentro do setor, ou null. */
+export function familiaAtual() {
+  if (!estado.familia) return null;
+  return (setorAtual().familias || []).find((f) => f.id === estado.familia)
+         || null;
+}
+
+/** As subclasses que o recorte de setor deixa passar: a familia, se houver. */
+export function subsDoSetor() {
+  const f = familiaAtual();
+  return f ? f.subs : setorAtual().subs;
+}
+
 /**
  * Condicoes sobre a view `f` (o cubo mestre ja com secao, classe e
  * subclasse). Devolve um array de pedacos para juntar com AND.
  */
-export function condicoes({ semPais = false, semIpc = false } = {}) {
+export function condicoes({ semPais = false, semIpc = false, semAno = false,
+                             semConc = false } = {}) {
   const c = [];
   const col = colPais();
 
@@ -42,17 +57,21 @@ export function condicoes({ semPais = false, semIpc = false } = {}) {
     const ps = lista(estado.paises);
     if (ps) c.push(`${col} IN (${ps})`);
   }
-  if (estado.ano1 !== "") c.push(`a >= ${Number(estado.ano1)}`);
-  if (estado.ano2 !== "") c.push(`a <= ${Number(estado.ano2)}`);
-  if (estado.conc === "1") c.push("g");
-  if (estado.conc === "0") c.push("NOT g");
+  if (!semAno) {
+    if (estado.ano1 !== "") c.push(`a >= ${Number(estado.ano1)}`);
+    if (estado.ano2 !== "") c.push(`a <= ${Number(estado.ano2)}`);
+  }
+  if (!semConc) {
+    if (estado.conc === "1") c.push("g");
+    if (estado.conc === "0") c.push("NOT g");
+  }
 
   if (!semIpc) {
     const s = setorAtual();
     if (s.regra === "secao") {
       c.push(`sec IN (${lista(s.subs)})`);
     } else if (s.regra === "sub") {
-      c.push(`sub IN (${lista(s.subs)})`);
+      c.push(`sub IN (${lista(subsDoSetor())})`);
     }
     if (estado.sub) c.push(`sub = '${estado.sub}'`);
     else if (estado.cls) c.push(`cls = '${estado.cls}'`);
@@ -89,7 +108,7 @@ export function ondeTitulares(mapaPais) {
   if (s.regra === "secao") {
     c.push("(" + s.subs.map((x) => `sub LIKE '${x}%'`).join(" OR ") + ")");
   } else if (s.regra === "sub") {
-    c.push(`sub IN (${lista(s.subs)})`);
+    c.push(`sub IN (${lista(subsDoSetor())})`);
   }
   if (estado.sub) c.push(`sub = '${estado.sub}'`);
   else if (estado.cls) c.push(`sub LIKE '${estado.cls}%'`);
@@ -106,7 +125,9 @@ export function descricao(nomePais) {
   else if (estado.paises.length > 1) p.push(`${estado.paises.length} países`);
   else p.push("mundo");
   const s = setorAtual();
-  if (s.id !== "tudo") p.push(s.nome.replace(/^· /, ""));
+  if (s.id !== "tudo") p.push(s.nome);
+  const f = familiaAtual();
+  if (f) p.push(f.nome);
   if (estado.sub) p.push(estado.sub);
   else if (estado.cls) p.push(estado.cls);
   else if (estado.sec) p.push("seção " + estado.sec);
@@ -121,6 +142,6 @@ export function descricao(nomePais) {
 export function limpar() {
   Object.assign(estado, {
     lente: "of", paises: [], ano1: "", ano2: "", setor: "tudo",
-    sec: "", cls: "", sub: "", conc: "", nivel: "sec", pai: "",
+    familia: "", sec: "", cls: "", sub: "", conc: "", nivel: "sec", pai: "",
   });
 }

@@ -35,14 +35,14 @@ painel fica atrás. Por isso o `.bat` passa `--no-first-run`,
 desligamento da experiência de primeira execução do Edge. Com elas, abre
 **uma** aba, direto na página.
 
-## Sete abas, não uma rolagem
+## Oito abas, não uma rolagem
 
 A página era um empilhamento de sete painéis numa rolagem só. Agora cada
 aba é uma tela: **Panorama** (cartões, mapa-múndi e a rosca das áreas),
 **Territórios** (ranking e curva de concentração), **Tecnologia** (perfil
 em cascata e a rosca de concessão), **Tempo** (série anual e média por
-década), **Depositantes** (ranking e concentração), **Tabela** e
-**Metodologia**.
+década), **Vencimento** (quando termina o prazo das patentes concedidas),
+**Depositantes** (ranking e concentração), **Tabela** e **Metodologia**.
 
 Isso não é só estética. **O Plotly mede zero em container escondido**,
 então desenhar o que não está visível produz gráfico sem altura: só a aba
@@ -109,9 +109,12 @@ arquivo que não existe mais na entrega.
 python ObservatorioPatentes/gerar_dicionario_completo.py   # PDFs -> dicionário
 python ObservatorioPatentes/preparar/01_cubos.py           # ~2 min
 python ObservatorioPatentes/preparar/03_titulares.py       # ~3 min
+python ObservatorioPatentes/preparar/05_vencimento.py      # ~15 min; antes do 02
 python ObservatorioPatentes/preparar/02_metadados.py       # use --reler
 python ObservatorioPatentes/preparar/04_montar.py          # monta entrega/
 python ObservatorioPatentes/preparar/provar.py             # abre e confere
+python ObservatorioPatentes/preparar/provar_setores.py     # setores, idioma, balão
+python ObservatorioPatentes/gerar_composicao_pdf.py        # um PDF por setor
 ```
 
 `02_metadados.py` guarda o diagnóstico da base em cache, porque varrer os
@@ -119,32 +122,144 @@ python ObservatorioPatentes/preparar/provar.py             # abre e confere
 
 ## Os setores não foram inventados
 
-Cada recorte do filtro **Setor / área tecnológica** vem de um dicionário,
-e a nota metodológica da página nomeia a fonte de cada um:
+Cada recorte vem de um dicionário, e a página nomeia a fonte de cada um:
 
-- **8 áreas da IPC** — as seções A a H, lidas dos PDFs oficiais da OMPI
+- **A classificação** — as seções A a H, lidas dos PDFs oficiais da OMPI
   (`documentos/wipo classificacoes/a.pdf` … `h.pdf`). O parser é o mesmo
   que já gerava o dicionário de TIC; aqui roda sobre as oito seções e
   produz **132 classes, 655 subclasses e 78.861 códigos**, sem duplicatas.
-- **TIC · pela CNAE do Observatório** — as **91 subclasses** do núcleo,
-  derivadas da definição de TIC do de-para de CNAE. É o único recorte de
-  TIC do seletor. Havia três — *escopo OMPI*, *escopo depurado* e este —
-  e os dois primeiros saíram em 18/09/2026: três opções parecidas na
-  mesma lista não dão escolha ao leitor, dão chance de errar. Quem
-  quiser comparar tem a planilha `entregas/Dicionario_IPC_ate_subclasse
-  .xlsx`, que traz as três colunas lado a lado.
-- **11 famílias de produto** — agrupamento do Observatório, declarado
-  como tal na nota, porque a IPC classifica a técnica e não o produto.
-  Eram oito, desenhadas para 57 subclasses; as três novas — instrumentos
-  e óptica, eletromédico, periféricos e armazenamento — cobrem o que
-  entrou com o recorte de 91.
+  As seções ficam só no filtro de Classificação: até 01/10/2026 elas
+  também eram opções do seletor de setor ("Áreas da IPC"), o que repetia
+  o filtro de baixo, e saíram a pedido do usuário.
+- **Os setores da SC Competitiva** — os 39 da coluna `SC Competitiva` do
+  de-para de CNAE do Observatório, **com o mesmo nome** (o TIC se chamava
+  "TIC · pela CNAE do Observatório"; desde 01/10/2026 é só "TIC").
+  - **TIC** continua sendo as **91 subclasses** do núcleo, de
+    `tic_por_cnae.py`. Havia três recortes de TIC — *escopo OMPI*,
+    *escopo depurado* e este — e os dois primeiros saíram em 18/09/2026.
+    A planilha `entregas/Dicionario_IPC_ate_subclasse.xlsx` traz as três
+    colunas lado a lado.
+  - **Os outros 38** moram em `setores_por_cnae.py`, uma linha por
+    subclasse, com família, aderência e motivo. A pergunta é a mesma do
+    TIC e na mesma direção: dadas as atividades da CNAE marcadas com o nome
+    do setor, que subclasses de **toda** a IPC correspondem ao que elas
+    fabricam — ou à técnica com que trabalham, nos setores primários e de
+    serviço (a A01B é agricultura; a G08G, transporte). Não entra a
+    tecnologia de uso geral que o setor só compra.
+- **As famílias** saíram do seletor de setor. As onze de TIC já enchiam a
+  lista; com 31 setores ela ficaria gigante. Agora cada setor que se
+  divide oferece as suas num **segundo seletor**, que só aparece quando o
+  setor tem famílias. Nos setores novos as famílias seguem os grupos de
+  CNAE do de-para (10.1 carnes, 10.5 laticínios…); onde a IPC não separa
+  dois grupos, eles viram uma família só.
 
-**Nenhum outro setor pode ser construído com honestidade a partir do que
-existe hoje no projeto.** Os dicionários disponíveis cobrem a estrutura da
-IPC e a composição de TIC — nada define, por exemplo, "biotecnologia" ou
-"química fina". Para isso faltaria uma concordância publicada, como os 35
-campos tecnológicos da OMPI. Enquanto ela não entrar no projeto, o filtro
-não a oferece.
+**Núcleo ou fronteira se decide por número, não por título.** O cubo
+guarda o código IPC completo, então dá para medir, dentro de cada
+subclasse, quanto do volume cai em cada grupo principal. É núcleo a
+subclasse em que **mais da metade** das publicações pertence ao setor;
+abaixo disso ela é fronteira, fica registrada e fora da conta. Medido:
+a A01K é 60% pecuária e 40% aquicultura e pesca — núcleo da
+Agropecuária, fronteira da Pesca; a A61F é 75% prótese e 25% fralda —
+núcleo da Indústria Diversa, fronteira do Papel e Celulose.
+
+**Sobreposição é permitida, por decisão do usuário.** A A01D (colheita) é
+técnica da Agropecuária e produto das Máquinas (28.3); a G01N é TIC e
+Serviços Profissionais (71.2). Os setores **não somam** o total da base.
+Juntos, alcançam **89,2%** das publicações com subclasse válida; o que
+fica fora é de fato transversal — embalagem (B65D), separação (B01D),
+biotecnologia (C12N, C12Q), revestimento (C23C).
+
+**Oito setores não têm núcleo** e ficam fora do seletor — um filtro que
+devolve zero não é escolha: Comércio por Atacado, Alojamento e
+Alimentação, Serviços Imobiliários, Serviços Domésticos, Serviços
+Diversos, Organismos Internacionais (serviços sem técnica patenteável
+própria), e **Pesca e Aquicultura** e **Produção Florestal**, que a IPC
+dissolve dentro da A01K e da A01G. Separar essas duas exigiria recorte
+por grupo principal, que o cubo leve não tem. Os oito aparecem na
+composição, com o motivo.
+
+**A composição de cada setor está na página e em PDF.** Na aba
+Metodologia, a primeira abinha, *Composição dos setores*, mostra um setor
+por vez: as atividades da CNAE, o núcleo por família com o motivo de cada
+subclasse e, recolhida, a fronteira. (A antiga abinha *Recorte
+selecionado* saiu a pedido do usuário: repetia a lista de códigos que a
+composição já mostra melhor.) Os PDFs — só o núcleo, TIC incluído — saem
+de `gerar_composicao_pdf.py` para `documentos/Composição dos setores de
+patentes/Composição <Setor>.pdf`, lendo o mesmo `meta.js` que a página
+publica. Cuidado com o homônimo: o `Composição TIC.pdf` solto em
+`documentos/` é o estudo da CNI/SENAI de 2010 sobre a indústria de TIC,
+não o nosso, e o script se recusa a escrever por cima de PDF que não
+tenha saído dele.
+
+## A página abre em português
+
+Classes e subclasses têm título em português (`traducao_ipc.py`, na
+terminologia da CIP do INPI quando ela existe); o botão **PT | EN**, no
+cabeçalho, mostra o inglês oficial da OMPI, e o navegador lembra a
+escolha. A tradução para na subclasse: os 78 mil códigos completos ficam
+no inglês oficial, e a tabela avisa.
+
+**Dez subclasses chegavam com o título quebrado** do parser dos PDFs — a
+B22F aparecia como `1/10) [2022.01] 8/00`, a G01S como `5/00)`. O título
+oficial vai em `traducao_ipc.QUEBRADOS`, e o `02_metadados.py` se recusa
+a rodar se surgir outro título com cara de código.
+
+**As extintas em uso entraram no seletor.** H01L, F24J e C12S não estão
+na IPC 2026.01 mas rotulam publicações — a H01L, 3,58 milhões. Antes não
+havia como escolhê-las na cascata; agora aparecem marcadas como
+extintas.
+
+## O balão do izinho cabe na tela
+
+Ele era um `<span>` absoluto dentro do próprio izinho e saía cortado: a
+barra lateral tem rolagem própria, e todo filho que passa da borda dela
+é recortado — o balão de 320 px não cabia nos 276 px da coluna. Agora há
+um balão só (`src/bolha.js`), fixo na janela e fora de qualquer caixa,
+que copia o texto do izinho ao abrir e se posiciona dentro da tela. A
+prova (`provar_setores.py`) passa o mouse em cinco izinhos e confere que
+o balão inteiro cabe.
+
+## A página não traz o caminho da máquina nem o nome do arquivo
+
+Mostrava `C:\Users\<usuário>\Desktop\...\patentes_publications_202511
+.parquet` — e o `meta.js` é servido publicamente pelo site. O caminho
+saiu **do dado**, não só da tela (e do cache do diagnóstico). Depois saiu
+também o nome do arquivo, que ainda aparecia no rodapé de todos os
+izinhos, na metodologia geral, na linha do cabeçalho e no CSV: a fonte é
+"Google Patents, via BigQuery", e é isso que a página diz. O teste lê o
+`textContent` da página, não o `innerText`, porque o texto dos izinhos
+fica escondido até o mouse passar — foi por ali que o nome escapou da
+primeira vez. A seção da base diz até quando vão as publicações:
+**23/10/2025**.
+
+## Vencimento: prazo máximo, não situação jurídica
+
+A base não tem data de vencimento nem situação legal. Tem a data de
+depósito e a de concessão, e com elas `05_vencimento.py` calcula o
+**prazo máximo** que a lei dá a cada patente concedida — o teto. Muitas
+caducam antes, por falta de anuidade, e algumas ganham prorrogação (PTA
+nos EUA, SPC na Europa); nada disso está na base, e a aba diz isso junto
+de cada número.
+
+- **Invenção:** 20 anos do depósito (TRIPS). EUA com depósito antes de
+  08/06/1995: o maior entre 17 anos da concessão e 20 do depósito.
+- **Modelo de utilidade:** prazo do país (`PRAZO_MU`: Brasil e México 15,
+  França 6, o resto 10).
+- **Concedida** é `grant_date` preenchida **ou** código de publicação de
+  concessão (B/C; Y no modelo de utilidade). **O Brasil não preenche
+  `grant_date` em nenhuma publicação** — sem o código, teria zero
+  concessões. Suécia, Suíça, México, Noruega e Israel também não.
+- **Um pedido, uma vez** — pedido publicado e concessão são publicações
+  separadas. Validações nacionais de patente europeia (tipo T) ficam
+  fora: já contam no EP.
+- O cubo só guarda prazo terminando no ano corrente ou depois, com o ano
+  de depósito ao lado: a coluna de vencimento cuja maior parte vem de
+  depósito recente sai em tom neutro, porque muitos desses pedidos ainda
+  estão em exame. "Recente" é diferente para cada tipo: cinco anos na
+  invenção, que leva anos para ser concedida; dois no modelo de
+  utilidade, que a China concede em meses.
+- Período e situação de concessão da lateral não valem na aba; país,
+  lente, setor e classificação valem.
 
 ## A limitação que governa todo o resto
 
@@ -352,5 +467,10 @@ salvos localmente em `motor/`.
 | `entrega/metadados/` | dicionário, setores, países, diagnóstico |
 | `gerar_dicionario_completo.py` | PDFs da OMPI → `dicionarios/ipc_completo.xlsx` |
 | `nomes_territorios.py` | nomes em português dos 274 códigos de território |
+| `tic_por_cnae.py` | as 106 subclasses de TIC (91 núcleo), com motivo |
+| `setores_por_cnae.py` | os outros 38 setores da SC Competitiva, subclasse por subclasse |
+| `traducao_ipc.py` | títulos em português até a subclasse e os dez títulos corrigidos |
+| `gerar_composicao_pdf.py` | um PDF de composição por setor, em `documentos/Composição dos setores de patentes/` |
+| `preparar/05_vencimento.py` | o cubo de vencimento (1,3 MB) e o resumo dele |
 | `preparar/` | os scripts de preparo e a prova |
 | `provas/` | as telas capturadas pela prova |

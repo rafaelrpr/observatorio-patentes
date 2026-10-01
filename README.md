@@ -31,15 +31,27 @@ Os cubos pesados chegam **sob demanda**: a primeira tela usa só os
 leves. O cubo por código IPC (95 MB) e o de depositantes (57 MB) são
 baixados quando a pergunta exige, e não na abertura.
 
-## O recorte de TIC
+## Os recortes por setor
 
-Um só, o do de-para de CNAE do Observatório: **91 subclasses da IPC**,
-o núcleo. Elas vêm de varrer a IPC inteira perguntando o que as 33
-atividades marcadas como TIC produzem — e não de filtrar a lista de TIC
-da OMPI por divisão da CNAE, caminho que já começa perdendo
-instrumento de medida, óptica, relógio, mídia e memória, que a divisão
-26 fabrica. A aba **Metodologia** da página traz a regra inteira, e
-`LEIA-ME.md` traz a construção.
+Os setores são os 39 da coluna **SC Competitiva** do de-para de CNAE do
+Observatório, com o mesmo nome. Para cada um, as subclasses da IPC que
+correspondem ao que as atividades dele fabricam, ou à técnica com que
+trabalham — varrendo a IPC inteira a partir da CNAE, e não filtrando uma
+lista pronta. O TIC é o mesmo de antes: **91 subclasses**, o núcleo. É
+núcleo a subclasse em que mais da metade das publicações, medida por
+grupo principal, pertence ao setor; o resto é fronteira e fica fora da
+conta. Oito setores não têm núcleo e ficam fora do filtro. A aba
+**Metodologia › Composição dos setores** mostra cada um, subclasse por
+subclasse, e `LEIA-ME.md` traz a construção.
+
+## Vencimento
+
+A aba **Vencimento** mostra quando termina o **prazo máximo** de cada
+patente concedida: 20 anos do depósito na invenção, o prazo do país no
+modelo de utilidade (15 anos no Brasil, 10 na China). É o teto da lei,
+não a situação jurídica, que a base não tem: muitas caducam antes, por
+falta de anuidade. O cubo (`dados/vencimento.parquet`, 1,3 MB) conta
+cada pedido uma vez.
 
 ## Publicação
 

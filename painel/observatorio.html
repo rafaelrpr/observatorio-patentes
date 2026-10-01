@@ -22,7 +22,6 @@
     /* categorica de 5, validada em TODOS os pares: normal 17,1 / CVD 9,2 */
     --c1: #3B63F3; --c2: #BC3800; --c3: #B88900;
     --c4: #009ECE; --c5: #E2358F;
-    --faixa-a: #0A2A46; --faixa-b: #16294F;
     --display: Archivo, "Segoe UI", system-ui, sans-serif;
     --corpo: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace;
@@ -59,19 +58,29 @@
   button, select, input { font-family: inherit; font-size: inherit; }
 
   /* ------------------------------------------------------- cabecalho */
+  /* No padrao das paginas do site do Observatorio (os conselhos
+     setoriais): faixa alta, titulo grande em duas linhas, degrade de azul
+     que puxa para o roxo na ponta direita. Pedido do usuario. */
   .faixa {
-    background: linear-gradient(104deg, var(--faixa-a), var(--faixa-b));
-    padding: 24px 32px 26px; display: flex; gap: 20px;
-    align-items: flex-start; justify-content: space-between;
+    position: relative;
+    background: linear-gradient(100deg, #12267E 0%, #1736B2 38%,
+                                #1C3DC0 70%, #6A5BC2 100%);
+    /* a margem acompanha a do conteudo (.quadro: 1660px, 18px de
+       respiro), para o titulo comecar na mesma linha da lateral */
+    --margem: max(18px, calc((100% - 1660px) / 2 + 18px));
+    min-height: 220px; padding: 44px var(--margem) 46px;
+    display: flex; align-items: center;
     border-bottom: 1px solid var(--line);
   }
   .faixa h1 {
-    margin: 0; color: #FFFFFF; font-weight: 700; font-size: 1.72rem;
-    line-height: 1.16; text-wrap: balance;
+    margin: 0; color: #FFFFFF; font-weight: 600;
+    font-size: clamp(1.75rem, 2.2vw, 2.5rem); line-height: 1.15;
+    letter-spacing: -.01em; max-width: 13em; text-wrap: balance;
   }
-  .faixa p { margin: 7px 0 0; color: #A9C4DC; font-size: .85rem;
-             max-width: 74ch; }
-  .faixa code { font-family: var(--mono); font-size: .79rem; color: #CFE6F5; }
+  .faixa .ferramentas { position: absolute; top: 18px; right: var(--margem); }
+  @media (max-width: 720px) {
+    .faixa { --margem: 16px; min-height: 0; padding: 60px 16px 30px; }
+  }
   #tema {
     flex: 0 0 auto; width: 32px; height: 32px; padding: 0; cursor: pointer;
     display: grid; place-items: center; border-radius: 7px;
@@ -79,6 +88,18 @@
     border: 1px solid rgba(255, 255, 255, .16);
   }
   #tema:hover { color: #FFFFFF; border-color: rgba(255, 255, 255, .4); }
+  .ferramentas { display: flex; gap: 8px; align-items: center;
+                 flex: 0 0 auto; }
+  .idioma { display: flex; border-radius: 7px; overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, .16); }
+  .idioma button {
+    height: 30px; padding: 0 9px; border: 0; cursor: pointer;
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    color: #A9C4DC; background: rgba(255, 255, 255, .07);
+  }
+  .idioma button + button { border-left: 1px solid rgba(255, 255, 255, .16); }
+  .idioma button:hover { color: #FFFFFF; }
+  .idioma button[aria-pressed="true"] { color: #04121C; background: #A9C4DC; }
 
   /* ------------------------------------------------------- estrutura */
   .quadro {
@@ -182,6 +203,14 @@
   }
   .lente button:first-child { border-radius: 6px 0 0 6px; }
   .lente button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+  .lente.tres { grid-template-columns: repeat(3, auto); }
+  .lente.tres button + button { border-left: none; }
+  .lente.tres button:not(:first-child):not(:last-child) { border-radius: 0; }
+  .venc-barra { display: flex; flex-wrap: wrap; gap: 14px 24px;
+                align-items: flex-end; }
+  .venc-barra .lente button { padding: 7px 12px; }
+  .venc-aviso { flex: 1 1 300px; margin: 0; font-size: .8rem;
+                color: var(--ink-muted); line-height: 1.45; }
   .lente button[aria-pressed="true"] {
     color: #FFFFFF; background: var(--acento); border-color: var(--acento);
     font-weight: 600;
@@ -254,24 +283,28 @@
     border: 1px solid var(--line); position: relative;
   }
   .info:hover { color: var(--acento); border-color: var(--acento); }
-  .info > span {
-    display: none; position: absolute; left: 50%; bottom: 150%;
-    transform: translateX(-50%); width: 320px; z-index: 40;
+  /* O texto de cada izinho mora no <span> dele, mas quem aparece e o
+     #bolha, fixo na janela. O balao absoluto de antes saia cortado: a
+     lateral tem rolagem propria e recorta o que passa da borda dela. */
+  .info > span { display: none !important; }
+  #bolha {
+    position: fixed; left: 0; top: 0; z-index: 120; width: max-content;
+    max-width: min(340px, calc(100vw - 20px));
+    max-height: calc(100vh - 20px); overflow-y: auto;
     padding: 9px 11px; border-radius: 7px; text-align: left;
     font-family: var(--corpo); font-size: .78rem; font-weight: 400;
     line-height: 1.45; color: var(--ink); background: var(--surface-2);
     border: 1px solid var(--line); box-shadow: 0 8px 22px rgba(0, 0, 0, .45);
-    cursor: default; text-transform: none; letter-spacing: 0;
-    white-space: normal;
+    text-transform: none; letter-spacing: 0; white-space: normal;
   }
-  .info:hover > span, .info:focus-visible > span { display: block; }
+  #bolha code { font-family: var(--mono); font-size: .72rem; }
   /* o que antes era subtitulo abaixo do grafico: fica aqui, em destaque,
      porque muda com o recorte e e o que o leitor pergunta primeiro */
-  .info .viva:not(:empty) {
+  #bolha .viva:not(:empty) {
     display: block; margin-top: 7px; padding-top: 7px;
     border-top: 1px solid var(--line); color: var(--acento-forte);
   }
-  .info > span em {
+  #bolha em {
     display: block; margin-top: 6px; font-style: normal;
     font-family: var(--mono); font-size: .67rem; color: var(--ink-faint);
   }
@@ -316,10 +349,47 @@
          font-variant-numeric: tabular-nums; }
 
   /* ----------------------------------------------------- metodologia */
-  details.notas {
+  details.notas, div.notas {
     background: var(--surface); border: 1px solid var(--line);
     border-radius: 9px;
   }
+  div.notas { padding: 4px 16px 16px; }
+  div.notas > h3 { margin: 12px 0 2px; font-size: .97rem; font-weight: 600; }
+  .subabas button { font-size: .8rem; padding: 7px 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    padding: 5px 10px; border-radius: 999px; font-size: .78rem;
+    color: var(--ink-muted); background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .chip span { font-family: var(--mono); font-size: .66rem;
+               color: var(--ink-faint); }
+  .chip:hover { color: var(--ink); border-color: var(--acento); }
+  .chip.vazio { border-style: dashed; }
+  .chip[aria-pressed="true"] { color: #FFFFFF; background: var(--acento);
+                               border-color: var(--acento); }
+  .chip[aria-pressed="true"] span { color: #FFFFFF; }
+  .notas h5 {
+    margin: 16px 0 6px; font-family: var(--display); font-size: .84rem;
+    font-weight: 600; color: var(--ink);
+  }
+  .notas h5 span { display: block; margin-top: 1px; font-family: var(--mono);
+    font-size: .66rem; font-weight: 500; color: var(--ink-faint); }
+  .notas ul.cnae { columns: 2 300px; column-gap: 24px; }
+  .notas ul.cnae li { break-inside: avoid; }
+  table.comp td.porque { color: var(--ink-muted); min-width: 260px; }
+  table.comp td.larga { min-width: 240px; }
+  .marca { font-family: var(--mono); font-size: .6rem; padding: 0 4px;
+    border-radius: 3px; color: var(--ink-faint); border: 1px solid var(--line); }
+  .notas .resumo { color: var(--ink); }
+  .notas .fonte-comp { margin-top: 12px; font-family: var(--mono);
+    font-size: .68rem; color: var(--ink-faint); }
+  details.fronteira { margin-top: 16px; border-top: 1px solid var(--line);
+                      padding-top: 6px; }
+  details.fronteira > summary { cursor: pointer; font-size: .85rem;
+    color: var(--ink-muted); padding: 6px 0; }
+  details.fronteira > summary:hover { color: var(--ink); }
   details.notas > summary {
     cursor: pointer; list-style: none; padding: 13px 16px;
     font-family: var(--display); font-weight: 600; font-size: .97rem;
@@ -377,9 +447,16 @@
 <div class="faixa">
   <div>
     <h1>Observatório Mundial de Patentes</h1>
-    <p id="linha-base">Explorador da base local do Google Patents.</p>
   </div>
-  <button id="tema" type="button" title="Alternar tema" aria-label="Alternar tema"></button>
+  <div class="ferramentas">
+    <div class="idioma" id="idioma" role="group"
+      aria-label="Idioma dos títulos da classificação IPC"
+      title="Idioma dos títulos da classificação IPC">
+      <button type="button" data-l="pt" aria-pressed="true">PT</button>
+      <button type="button" data-l="en" aria-pressed="false">EN</button>
+    </div>
+    <button id="tema" type="button" title="Alternar tema" aria-label="Alternar tema"></button>
+  </div>
 </div>
 
 <div class="quadro">
@@ -423,6 +500,12 @@
         <select id="f-setor"></select>
       </div>
 
+      <div class="filtro" id="filtro-familia" hidden>
+        <p class="rotulo">Família do setor<span class="info"
+          tabindex="0">i<span id="dica-familia"></span></span></p>
+        <select id="f-familia"></select>
+      </div>
+
       <div class="filtro">
         <p class="rotulo">Classificação IPC<span class="info" tabindex="0">i<span
           id="dica-ipc"></span></span></p>
@@ -455,6 +538,7 @@
       <button type="button" data-v="territorios" aria-pressed="false">Territórios</button>
       <button type="button" data-v="tecnologia" aria-pressed="false">Tecnologia</button>
       <button type="button" data-v="tempo" aria-pressed="false">Tempo</button>
+      <button type="button" data-v="vencimento" aria-pressed="false">Vencimento</button>
       <button type="button" data-v="depositantes" aria-pressed="false">Depositantes</button>
       <button type="button" data-v="tabela" aria-pressed="false">Tabela</button>
       <button type="button" data-v="metodologia" aria-pressed="false">Metodologia</button>
@@ -534,6 +618,56 @@
       </div>
     </div>
 
+    <!-- =================================================== vencimento -->
+    <div class="vista" id="v-vencimento" hidden>
+      <div class="caixa venc-barra">
+        <div>
+          <p class="rotulo">Tipo</p>
+          <div class="lente tres" id="venc-tipo" role="group" aria-label="Tipo de patente">
+            <button type="button" data-v="0" aria-pressed="true">Invenção</button>
+            <button type="button" data-v="1" aria-pressed="false">Modelo de utilidade</button>
+            <button type="button" data-v="" aria-pressed="false">Os dois</button>
+          </div>
+        </div>
+        <div>
+          <p class="rotulo">Janela dos rankings</p>
+          <div class="lente" id="venc-janela" role="group" aria-label="Janela dos rankings">
+            <button type="button" data-v="5" aria-pressed="true">5 anos</button>
+            <button type="button" data-v="10" aria-pressed="false">10 anos</button>
+          </div>
+        </div>
+        <p class="venc-aviso"><strong>Prazo máximo, não vencimento real.</strong>
+          A base não tem situação jurídica: muitas patentes caducam antes, por
+          falta de anuidade. Período e situação de concessão, da lateral, não
+          valem nesta aba.</p>
+      </div>
+      <section class="cartoes" id="cartoes-venc"></section>
+      <div class="caixa">
+        <h2>Quando termina o prazo<span class="info" tabindex="0">i<span
+          class="bolha"><span id="dica-venc-ano"></span><span class="viva"
+          id="sub-venc-ano"></span></span></span></h2>
+        <div id="venc-ano" class="tela"></div>
+      </div>
+      <div class="grade-ii">
+        <div class="caixa">
+          <h2>Tecnologias que mais vencem<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-venc-subs"></span><span class="viva"
+            id="sub-venc-subs"></span></span></span></h2>
+          <div id="venc-subs" class="tela"></div>
+        </div>
+        <div class="caixa">
+          <h2>Onde vencem<span class="info" tabindex="0">i<span
+            class="bolha"><span id="dica-venc-paises"></span><span class="viva"
+            id="sub-venc-paises"></span></span></span></h2>
+          <div id="venc-paises" class="tela"></div>
+        </div>
+      </div>
+      <details class="notas">
+        <summary>Como o prazo é calculado</summary>
+        <div id="nota-venc"></div>
+      </details>
+    </div>
+
     <!-- ================================================= depositantes -->
     <div class="vista" id="v-depositantes" hidden>
       <div class="grade-2">
@@ -585,18 +719,26 @@
 
     <!-- ================================================== metodologia -->
     <div class="vista" id="v-metodologia" hidden>
-      <details class="notas" id="nota-setor">
-        <summary>Nota metodológica do recorte selecionado</summary>
-        <div id="corpo-nota-setor"></div>
-      </details>
-      <details class="notas">
-        <summary>Metodologia geral e limitações</summary>
+      <nav class="abas subabas" id="subabas" aria-label="Partes da metodologia">
+        <button type="button" data-m="composicao" aria-pressed="true">Composição dos setores</button>
+        <button type="button" data-m="geral" aria-pressed="false">Metodologia geral</button>
+        <button type="button" data-m="base" aria-pressed="false">Informações da base</button>
+      </nav>
+      <div class="notas" id="m-composicao">
+        <h3>Composição dos setores</h3>
+        <div id="comp-intro"></div>
+        <div class="chips" id="comp-setores" role="group"
+          aria-label="Escolha o setor"></div>
+        <div id="comp-detalhe"></div>
+      </div>
+      <div class="notas" id="m-geral" hidden>
+        <h3>Metodologia geral e limitações</h3>
         <div id="corpo-nota-geral"></div>
-      </details>
-      <details class="notas">
-        <summary>Informações da base</summary>
+      </div>
+      <div class="notas" id="m-base" hidden>
+        <h3>Informações da base</h3>
         <div id="corpo-nota-base"></div>
-      </details>
+      </div>
     </div>
   </main>
 
@@ -661,6 +803,8 @@
     setTimeout(explicar, 2500);
   })();
 </script>
+
+<div id="bolha" role="tooltip" hidden></div>
 
 <script src="plotly.min.js"></script>
 <script src="metadados/meta.js"></script>

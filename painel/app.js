@@ -6,11 +6,15 @@
 
 import * as motor from "./src/motor.js";
 import * as G from "./src/graficos.js";
-import { estado, colPais, setorAtual, onde, ondeTitulares, descricao, limpar }
-  from "./src/filtros.js";
+import { estado, colPais, setorAtual, onde,
+         ondeTitulares, descricao, limpar } from "./src/filtros.js";
 import { inteiro, curto, pct, um, esc, apara, capitaliza }
   from "./src/formato.js";
 import { montarNotas, dicas } from "./src/metodologia.js";
+import { montarComposicao } from "./src/composicao.js";
+import { ligarBolhas } from "./src/bolha.js";
+import { ligarVencimento, pintarVencimento, notaVencimento }
+  from "./src/vencimento.js";
 
 // Sinal de vida para a rede de segurança do observatorio.html: se este
 // módulo não carregar (o navegador bloqueia módulo em file:// sem
@@ -33,13 +37,26 @@ let usaCodigoCompleto = false;  // consultas precisam da view pesada?
 let ultimaTabela = { linhas: [], colunas: [], pagina: 0, total: 0 };
 let repintando = false;
 let pendente = false;
+let composicao = null;          // a aba de composicao dos setores
+let rotularIPC = () => {};      // reescreve a cascata no idioma escolhido
+
+// IDIOMA DOS TITULOS DA IPC. A pagina abre em portugues — traducao de
+// classe e subclasse feita no preparo — e o botao PT | EN mostra o
+// titulo oficial da OMPI. Lembrado por navegador, se ele deixar.
+let idioma = "pt";
+try {
+  if (localStorage.getItem("obs_patentes_idioma") === "en") idioma = "en";
+} catch (e) { /* sem armazenamento: fica o portugues */ }
+const tSec = (s) => (s ? (idioma === "en" ? s.t : s.pt) : "");
+const tCls = (c) => (c ? (idioma === "en" ? c.t : c.pt) : "");
+const tSub = (s) => (s ? (idioma === "en" ? s.t : s.pt) : "");
 
 // ABAS. A pagina era uma rolagem so com sete paineis; agora cada aba e
 // uma tela. Isso nao e so estetica: o Plotly mede zero em container
 // escondido, entao desenhar o que nao esta visivel produzia grafico de
 // altura zero. Repinta-se o que entra.
 const ABAS = ["panorama", "territorios", "tecnologia", "tempo",
-              "depositantes", "tabela", "metodologia"];
+              "vencimento", "depositantes", "tabela", "metodologia"];
 let aba = "panorama";
 
 // =====================================================================
@@ -56,6 +73,7 @@ const CUBOS = {
   fato: ["fato.parquet", "cubo por código IPC (95 MB)"],
   ipc_dic: ["ipc_dic.parquet", "dicionário da IPC (3 MB)"],
   titulares: ["titulares.parquet", "cubo de depositantes (57 MB)"],
+  vencimento: ["vencimento.parquet", "cubo de vencimentos"],
 };
 const LEVES = [["fato_sub"], ["subclasses_usadas"], ["paises"], ["ipc_uso"]]
   .map(([n]) => [n, CUBOS[n][0], CUBOS[n][1]]);
@@ -70,6 +88,12 @@ function garantir(nome) {
         await motor.sql(`CREATE OR REPLACE VIEW f AS
           SELECT t.p, t.tp, t.a, t.g, t.n, u.ipc, u.sub, u.cls, u.sec
           FROM fato t LEFT JOIN ipc_uso u ON u.id = t.c`);
+      }
+      if (nome === "vencimento") {
+        await motor.sql(`CREATE OR REPLACE VIEW fv AS
+          SELECT t.p, t.tp, t.v, t.d, t.k, t.n, u.sub,
+                 substr(u.sub, 1, 3) AS cls, substr(u.sub, 1, 1) AS sec
+          FROM vencimento t LEFT JOIN subclasses_usadas u ON u.id = t.s`);
       }
     })());
   }
@@ -176,11 +200,6 @@ async function abrir() {
 // =====================================================================
 function montarInterface() {
   const b = META.base;
-  $("linha-base").innerHTML =
-    inteiro(b.linhas) + " publicações de patente, de " + b.ano_min + " a "
-    + b.ano_max + ", em " + b.paises + " escritórios. Fonte única: o arquivo "
-    + "<code>" + esc(b.arquivo) + "</code>, extraído do Google Patents "
-    + "(BigQuery) e lido aqui, no seu navegador.";
 
   // ------ paises
   const sel = $("f-pais");
@@ -217,14 +236,19 @@ function montarInterface() {
   }
 
   // ------ setores
+  // As familias sairam desta lista: as onze de TIC ja a enchiam, e com os
+  // setores da SC Competitiva ela ficaria gigante. Cada setor que se
+  // divide mostra as suas num segundo seletor, logo abaixo.
   const fs = $("f-setor");
+  const ROTULO_GRUPO = { "Setores": "Setores (SC Competitiva)" };
   let grupoAtual = null, alvo = fs;
   for (const s of META.setores) {
+    if (s.regra === "vazio") continue;   // setor sem subclasse propria
     if (s.grupo !== grupoAtual) {
       grupoAtual = s.grupo;
       if (grupoAtual) {
         alvo = document.createElement("optgroup");
-        alvo.label = grupoAtual;
+        alvo.label = ROTULO_GRUPO[grupoAtual] || grupoAtual;
         fs.appendChild(alvo);
       } else {
         alvo = fs;
@@ -235,24 +259,47 @@ function montarInterface() {
     o.textContent = s.nome;
     alvo.appendChild(o);
   }
+  const ff = $("f-familia");
+  const encherFamilias = () => {
+    const fams = setorAtual().familias || [];
+    $("filtro-familia").hidden = fams.length < 2;
+    ff.length = 0;
+    ff.appendChild(new Option("Todas as famílias do setor", ""));
+    for (const f of fams) ff.appendChild(new Option(f.nome, f.id));
+    ff.value = estado.familia;
+  };
   fs.addEventListener("change", () => {
     estado.setor = fs.value;
+    estado.familia = "";
+    estado.nivel = "sec"; estado.pai = "";
+    encherFamilias();
+    if (composicao) composicao.selecionar(fs.value);
+    atualizar();
+  });
+  ff.addEventListener("change", () => {
+    estado.familia = ff.value;
     estado.nivel = "sec"; estado.pai = "";
     atualizar();
   });
+  encherFamilias();
 
   // ------ IPC em cascata
   const fSec = $("f-sec"), fCls = $("f-cls"), fSub = $("f-sub");
-  for (const s of META.secoes) {
-    fSec.appendChild(new Option(s.s + " · " + s.pt, s.s));
-  }
+  const encherSecoes = () => {
+    fSec.length = 1;
+    for (const s of META.secoes) {
+      fSec.appendChild(new Option(s.s + " · " + tSec(s), s.s));
+    }
+    fSec.value = estado.sec;
+  };
   const encherClasses = () => {
     fCls.length = 1;
     for (const c of META.classes) {
       if (!estado.sec || c.s === estado.sec) {
-        fCls.appendChild(new Option(c.c + " · " + apara(c.t, 42), c.c));
+        fCls.appendChild(new Option(c.c + " · " + apara(tCls(c), 42), c.c));
       }
     }
+    fCls.value = estado.cls;
   };
   const encherSubs = () => {
     fSub.length = 1;
@@ -260,11 +307,15 @@ function montarInterface() {
       if (estado.cls ? s.c === estado.cls
                      : (!estado.sec || s.s === estado.sec)) {
         fSub.appendChild(new Option(
-          s.sub + " · " + apara(s.g || s.t, 40), s.sub));
+          s.sub + " · " + apara(tSub(s), 40)
+          + (s.x ? (idioma === "en" ? " (retired)" : " (extinta)") : ""),
+          s.sub));
       }
     }
+    fSub.value = estado.sub;
   };
-  encherClasses(); encherSubs();
+  encherSecoes(); encherClasses(); encherSubs();
+  rotularIPC = () => { encherSecoes(); encherClasses(); encherSubs(); };
   fSec.addEventListener("change", () => {
     estado.sec = fSec.value; estado.cls = ""; estado.sub = "";
     encherClasses(); encherSubs(); atualizar();
@@ -287,12 +338,12 @@ function montarInterface() {
     estado.conc = e.target.value; atualizar();
   });
 
-  for (const b2 of document.querySelectorAll(".lente button")) {
+  for (const b2 of document.querySelectorAll(".lente button[data-lente]")) {
     b2.addEventListener("click", () => {
       estado.lente = b2.dataset.lente;
       estado.paises = [];
       for (const o of sel.options) o.selected = false;
-      for (const x of document.querySelectorAll(".lente button")) {
+      for (const x of document.querySelectorAll(".lente button[data-lente]")) {
         x.setAttribute("aria-pressed", String(x === b2));
       }
       atualizar();
@@ -308,9 +359,10 @@ function montarInterface() {
     fichasPais();
     $("f-ano1").value = ""; $("f-ano2").value = "";
     $("f-setor").value = "tudo"; $("f-conc").value = "";
+    encherFamilias();
     fSec.value = ""; encherClasses(); fCls.value = ""; encherSubs();
     fSub.value = "";
-    for (const x of document.querySelectorAll(".lente button")) {
+    for (const x of document.querySelectorAll(".lente button[data-lente]")) {
       x.setAttribute("aria-pressed", String(x.dataset.lente === "of"));
     }
     atualizar();
@@ -353,6 +405,38 @@ function montarInterface() {
     atualizar();
   });
 
+  // ------ idioma dos titulos da IPC
+  const marcarIdioma = () => {
+    for (const b of $("idioma").querySelectorAll("button")) {
+      b.setAttribute("aria-pressed", String(b.dataset.l === idioma));
+    }
+  };
+  marcarIdioma();
+  for (const b of $("idioma").querySelectorAll("button")) {
+    b.addEventListener("click", () => {
+      if (b.dataset.l === idioma) return;
+      idioma = b.dataset.l;
+      try { localStorage.setItem("obs_patentes_idioma", idioma); }
+      catch (e) { /* sem armazenamento: vale so para esta visita */ }
+      marcarIdioma();
+      rotularIPC();
+      if (composicao) composicao.repintar();
+      atualizar();
+    });
+  }
+
+  // ------ partes da metodologia
+  // Eram tres blocos recolhiveis numa coluna so; com a composicao dos
+  // setores eles viraram abinhas, porque a composicao sozinha e longa.
+  for (const b of $("subabas").querySelectorAll("button")) {
+    b.addEventListener("click", () => {
+      for (const x of $("subabas").querySelectorAll("button")) {
+        x.setAttribute("aria-pressed", String(x === b));
+        $("m-" + x.dataset.m).hidden = x !== b;
+      }
+    });
+  }
+
   // ------ abas
   for (const b of $("abas").querySelectorAll("button")) {
     b.addEventListener("click", () => {
@@ -367,6 +451,18 @@ function montarInterface() {
 
   dicas($);
   montarNotas($, META);
+  ligarVencimento($, atualizar);
+  notaVencimento($);
+  composicao = montarComposicao($, META, {
+    titulo: tSub,
+    aoFiltrar: (id) => {
+      fs.value = id;
+      fs.dispatchEvent(new Event("change"));
+      trocarAba("panorama");
+      scrollTo({ top: 0 });
+    },
+  });
+  ligarBolhas();
 }
 
 function aplicarAba() {
@@ -427,9 +523,6 @@ async function atualizar() {
     $("achados-t").textContent = total === 1 ? "publicação no recorte"
                                              : "publicações no recorte";
 
-    // a nota do recorte e barata e vale para qualquer aba
-    atualizarNotaSetor();
-
     // Só a aba visível é desenhada. Antes eram sete painéis por
     // repintura, incluindo os dois que dependem do cubo de 57 MB.
     if (aba === "panorama") {
@@ -445,6 +538,15 @@ async function atualizar() {
       await pintarPerfil(v, w, total);
     } else if (aba === "tempo") {
       await Promise.all([pintarSerie(v, w, col), pintarDecadas(v, w)]);
+    } else if (aba === "vencimento") {
+      await garantir("vencimento");
+      await pintarVencimento($, {
+        motor, G,
+        nomePais: (id) => nomePorId.get(id) || isoPorId.get(id) || "?",
+        isoPais: (id) => isoPorId.get(id) || "?",
+        titulo: (sub) => tSub(subPorCodigo.get(sub)),
+        aoPais: selecionarPais,
+      });
     } else if (aba === "depositantes") {
       // os dois dependem do cubo de 57 MB: não bloqueiam a tela
       voar(pintarTitulares(wTit));
@@ -638,21 +740,33 @@ async function pintarRoscaSecoes(v, w, total) {
   // A rosca desce com o filtro. Com a seção G escolhida havia uma fatia
   // só, e um gráfico de uma fatia não diz nada: agora ela mostra as
   // classes de G. Com uma classe escolhida, as subclasses dela.
-  const nivel = estado.cls ? "sub" : (estado.sec ? "cls" : "sec");
+  // E desce SOZINHA quando o recorte cabe numa categoria só: o setor de
+  // Fumo inteiro e a classe A24, a familia Software inteira e a G06 — a
+  // rosca de areas mostrava "uma categoria so" justo nesses casos.
+  const ORDEM = ["sec", "cls", "sub"];
+  let i = estado.cls ? 2 : (estado.sec ? 1 : 0);
+  let pai = estado.cls || estado.sec;
+  let linhas;
+  for (;;) {
+    const nv = ORDEM[i];
+    // O corte A–H só existe no nível da seção: a base carrega alguns
+    // milhares de códigos malformados cuja primeira letra não é seção.
+    const soAH = nv === "sec" ? " AND sec BETWEEN 'A' AND 'H'" : "";
+    linhas = await motor.sql(`
+      SELECT ${nv} AS k, sum(n) AS n FROM ${v} ${w}
+      ${w ? "AND" : "WHERE"} ${nv} IS NOT NULL ${soAH}
+      GROUP BY 1 ORDER BY n DESC`);
+    if (linhas.length !== 1 || i === 2) break;
+    pai = linhas[0].k;
+    i++;
+  }
+  const nivel = ORDEM[i];
   const titulo = {
     sec: "Áreas da classificação",
-    cls: "Classes de " + estado.sec,
-    sub: "Subclasses de " + estado.cls,
+    cls: "Classes de " + pai,
+    sub: "Subclasses de " + pai,
   }[nivel];
   $("tit-rosca").textContent = titulo;
-
-  // O corte A–H só existe no nível da seção: a base carrega alguns
-  // milhares de códigos malformados cuja primeira letra não é seção.
-  const soAH = nivel === "sec" ? " AND sec BETWEEN 'A' AND 'H'" : "";
-  const linhas = await motor.sql(`
-    SELECT ${nivel} AS k, sum(n) AS n FROM ${v} ${w}
-    ${w ? "AND" : "WHERE"} ${nivel} IS NOT NULL ${soAH}
-    GROUP BY 1 ORDER BY n DESC`);
 
   const fatias = agrupar(linhas.map((r) => {
     const t = rotuloIPC(nivel, r.k);
@@ -838,21 +952,25 @@ async function pintarPerfil(v, w, total) {
 function rotuloIPC(nivel, k) {
   if (nivel === "sec") {
     const s = secPorCodigo.get(k);
-    return { curto: k + " · " + (s ? s.pt : ""),
-             longo: k + " — " + (s ? s.t : "sem verbete"), extra: "" };
+    return { curto: k + " · " + (s ? tSec(s) : ""),
+             longo: k + " — " + (s ? tSec(s) : "sem verbete"), extra: "" };
   }
   if (nivel === "cls") {
     const c = clsPorCodigo.get(k);
-    return { curto: k + " · " + apara(c ? c.t : "sem verbete", 34),
-             longo: k + " — " + (c ? c.t : "sem verbete no dicionário"),
+    return { curto: k + " · " + apara(c ? tCls(c) : "sem verbete", 34),
+             longo: k + " — " + (c ? tCls(c) : "sem verbete no dicionário"),
              extra: "" };
   }
   if (nivel === "sub") {
     const s = subPorCodigo.get(k);
+    // a glosa curta, quando existe, e explicacao em portugues do
+    // Observatorio — so faz sentido ao lado do titulo em portugues
+    const glosa = s && s.g && idioma === "pt" ? s.g : "";
     return {
-      curto: k + (s && s.g ? " · " + apara(s.g, 30) : ""),
-      longo: k + (s ? " — " + s.t : ""),
-      extra: s ? (s.g ? "<br><i>" + s.g + "</i>" : "")
+      curto: k + (s ? " · " + apara(tSub(s), 30) : ""),
+      longo: k + (s ? " — " + tSub(s) : ""),
+      extra: s ? (glosa ? "<br><i>" + esc(glosa) + "</i>" : "")
+                 + (s.x ? "<br><i>subclasse extinta, ainda em uso</i>" : "")
                : "<br><i>código fora da IPC 2026.01</i>",
     };
   }
@@ -921,7 +1039,7 @@ const ano = (v) => (v ? String(v) : "—");
  */
 function semVerbete(codigo) {
   const s = subPorCodigo.get(String(codigo).slice(0, 4));
-  return s ? "[fora da IPC 2026.01] " + (s.g || s.t)
+  return s ? "[fora da IPC 2026.01] " + tSub(s)
            : "código fora da IPC 2026.01";
 }
 
@@ -1037,7 +1155,7 @@ async function carregarTabela(v, w, col, wt) {
     const q = busca.toLowerCase();
     const descreve = (k) => {
       const s = subPorCodigo.get(k);
-      return s ? (s.g ? s.g + " — " + s.t : s.t)
+      return s ? tSub(s) + (s.x ? " [extinta]" : "")
                : "subclasse fora da IPC 2026.01";
     };
     linhas = base.filter((r) => !q
@@ -1055,7 +1173,11 @@ async function carregarTabela(v, w, col, wt) {
   $("sub-tabela").innerHTML = "Cada linha é um agregado do cubo, não uma "
     + "publicação individual — a base tem 166,9 milhões de registros e "
     + "carregá-los aqui derrubaria o navegador. Recorte: "
-    + esc(descricao((id) => nomePorId.get(id) || "?")) + ".";
+    + esc(descricao((id) => nomePorId.get(id) || "?")) + "."
+    + (grao === "ipc" && idioma === "pt"
+        ? " Os títulos dos códigos completos estão no inglês oficial da "
+          + "OMPI: a tradução vai até a subclasse."
+        : "");
   pintarTabela();
 }
 
@@ -1107,7 +1229,7 @@ function baixarCSV() {
   const linhas = [
     ["# Observatório Mundial de Patentes — recorte: "
      + descricao((id) => nomePorId.get(id) || "?")],
-    ["# Fonte: " + META.base.arquivo + " (Google Patents via BigQuery)"],
+    ["# Fonte: Google Patents, via BigQuery"],
     ["# Unidade: publicação de patente. Um código IPC por publicação."],
     t.colunas,
     ...t.linhas,
@@ -1261,36 +1383,6 @@ function selecionarPais(id) {
   estado.paises = [...sel.selectedOptions].map((o) => Number(o.value));
   fichasPais();
   atualizar();
-}
-
-function atualizarNotaSetor() {
-  const s = setorAtual();
-  const alvo = $("corpo-nota-setor");
-  const lista = s.subs.length && s.regra === "sub"
-    ? "<p><strong>Códigos usados</strong> (" + s.subs.length + " subclasses): "
-      + "<code>" + s.subs.join("</code> <code>") + "</code></p>"
-    : (s.regra === "secao"
-        ? "<p><strong>Regra de inclusão:</strong> o código IPC da publicação "
-          + "começa por <code>" + s.subs.join("</code> ou <code>")
-          + "</code>.</p>"
-        : "");
-  alvo.innerHTML =
-    "<h4>" + esc(s.nome.replace(/^· /, "")) + "</h4>"
-    + '<p class="destaque">' + esc(s.nota) + "</p>"
-    + lista
-    + (s.regra === "sub"
-        ? "<p><strong>Regra de inclusão:</strong> a subclasse do código IPC "
-          + "da publicação está na lista acima.</p>"
-        : "")
-    + "<p><strong>Fonte da definição:</strong> " + esc(s.fonte) + "</p>"
-    + "<p><strong>Limitação que vale para todos os setores:</strong> a base "
-    + "guarda <strong>um único código IPC por publicação</strong>, e ele não "
-    + "é necessariamente o principal. Uma publicação que também tratava "
-    + "deste setor, mas cujo código guardado caiu em outro, não aparece "
-    + "aqui. O efeito é maior nos escritórios que classificam com mais "
-    + "códigos — ver a metodologia geral.</p>";
-  $("nota-setor").querySelector("summary").textContent =
-    "Nota metodológica — " + s.nome.replace(/^· /, "");
 }
 
 abrir();
